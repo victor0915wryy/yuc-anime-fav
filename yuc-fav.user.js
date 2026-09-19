@@ -56,6 +56,23 @@
         .yf-day-inline{color:#ff5252;font-weight:bold;margin-right:4px}
         .yf-del{cursor:pointer;color:#c66;padding:0 4px}
         .yf-star{position:absolute;z-index:10;right:4px;top:2px;font-size:24px;line-height:1;cursor:pointer;color:#f5a623;user-select:none}
+        .yf-item {
+    display: flex;
+    gap: 8px;
+    padding: 6px 8px;
+    border-top: 1px solid #444;
+    align-items: center; /* 垂直置中或對齊，確保各列高度一致 */
+    height: 48px;        /* 強制固定每一列的高度，避免因文字長短導致高度不一 */
+    box-sizing: border-box;
+}
+
+.yf-del {
+    cursor: pointer;
+    color: c66;
+    padding: 4px 8px;
+    user-select: none;
+    flex: none; /* 防止被擠壓變形 */
+}
     `;
     document.head.appendChild(style);
 
@@ -529,7 +546,30 @@
 
     let cachedImages = [];
     let cachedDateHeaders = [];
+function render(targetExpandMonth = null) {
+    const data = load();
+    const keys = Object.keys(data).sort().reverse();
+    // ... (計算總數與清空 content 的邏輯維持不變) ...
 
+    keys.forEach(k => {
+        const list = data[k];
+        if (!list || list.length === 0) return;
+
+        const details = document.createElement('details');
+        details.className = 'yf-season-group';
+
+        // 【核心邏輯】如果指定了要展開的季度，或者總共只有一季，則保持展開；其餘預設摺疊
+        if (targetExpandMonth ? k === targetExpandMonth : keys.length === 1) {
+            details.open = true;
+        }
+
+        const summary = document.createElement('summary');
+        summary.textContent = `${k} (${list.length})`;
+        details.appendChild(summary);
+
+        // ... (下方組裝 list 項目與 append 的邏輯維持不變) ...
+    });
+}
     function initCaches() {
         cachedImages = [...document.querySelectorAll('img')].filter(img => {
             const w = img.clientWidth || parseInt(img.getAttribute('width') || '0', 10);
@@ -656,6 +696,7 @@
 
         traverseAndConvert(content, currentLang === 'tw');
     }
+
 
     function refresh() {
         const favs = load();
