@@ -1,2 +1,2 @@
 # yuc-anime-fav
-yuc.wiki 新番收藏夹油猴脚本
+專為長門番堂 (yuc.wiki) 打造的油猴腳本（Tampermonkey Script），一個簡易本地追番收藏夾。
