@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name        長門番堂新番追番列表
+// @name         長門番堂新番追番列表
 // @namespace    yuc-fav
-// @version      2.3
+// @version      2.4
 // @match        *://yuc.wiki/*
 // @connect      i0.hdslb.com
 // @connect      *
@@ -39,7 +39,13 @@
         .yf-lang-btn:hover:not(.active){color:#fff;background:#444;}
         .yf-lang-btn.active{background:#e8f0fe;color:#1a73e8;font-weight:bold;}
 
-        .yf-backup-container{position:absolute;right:96px;top:3px;display:inline-block;padding-bottom:10px;}
+        /* 新增：并排/网格模式切换按钮 */
+        .yf-grid-toggle{position:absolute;right:100px;top:3px;}
+        .yf-grid-btn{padding:2px 8px;font-size:12px;cursor:pointer;color:#aaa;background:#333;border:1px solid #444;border-radius:4px;line-height:1.4;user-select:none;transition:all 0.15s;display:inline-block;}
+        .yf-grid-btn:hover:not(.active){color:#fff;background:#444;}
+        .yf-grid-btn.active{background:#e8f0fe;color:#1a73e8;font-weight:bold;border-color:#e8f0fe;}
+
+        .yf-backup-container{position:absolute;right:138px;top:3px;display:inline-block;padding-bottom:10px;}
         .yf-backup-btn{padding:2px 8px;font-size:12px;cursor:pointer;color:#aaa;background:#333;border:1px solid #444;border-radius:4px;line-height:1.4;user-select:none;}
         .yf-backup-btn:hover{color:#fff;background:#444;}
         .yf-backup-menu{display:none;position:absolute;right:0;top:100%;background:#333;border:1px solid #555;border-radius:4px;box-shadow:0 4px 8px rgba(0,0,0,0.3);z-index:10;white-space:nowrap;}
@@ -48,37 +54,38 @@
         .yf-backup-option:hover{background:#444;color:#fff;}
 
         .yf-panel summary{cursor:pointer;padding:6px 8px;background:#3a3a3a}
-        .yf-item{display:flex;gap:8px;padding:6px 8px;border-top:1px solid #444;align-items:flex-start}
+        .yf-item{display:flex;gap:8px;padding:6px 8px;border-top:1px solid #444;align-items:center;height:48px;box-sizing:border-box}
         .yf-item img{width:calc(45px * var(--yf-s, 1));height:calc(56px * var(--yf-s, 1));object-fit:cover;flex:none;background:#444;border-radius:3px}
         .yf-info{flex:1;overflow:hidden}
         .yf-cn{font-weight:bold}
         .yf-jp,.yf-tag{color:#aaa;font-size:12px}
         .yf-day-inline{color:#ff5252;font-weight:bold;margin-right:4px}
-        .yf-del{cursor:pointer;color:#c66;padding:0 4px}
+        .yf-del{cursor:pointer;color:#c66;padding:4px 8px;user-select:none;flex:none}
         .yf-star{position:absolute;z-index:10;right:4px;top:2px;font-size:24px;line-height:1;cursor:pointer;color:#f5a623;user-select:none}
-        .yf-item {
-    display: flex;
-    gap: 8px;
-    padding: 6px 8px;
-    border-top: 1px solid #444;
-    align-items: center; /* 垂直置中或對齊，確保各列高度一致 */
-    height: 48px;        /* 強制固定每一列的高度，避免因文字長短導致高度不一 */
-    box-sizing: border-box;
-}
 
-.yf-del {
-    cursor: pointer;
-    color: c66;
-    padding: 4px 8px;
-    user-select: none;
-    flex: none; /* 防止被擠壓變形 */
-}
+        /* 新增：并排模式（网格布局） */
+        .yf-panel.yf-grid .yf-item{
+            display:inline-flex;
+            width:calc(50% - 4px);
+            margin:2px;
+            vertical-align:top;
+            height:auto;
+            min-height:48px;
+            border:1px solid #444;
+            border-radius:4px;
+            box-sizing:border-box;
+        }
+        .yf-panel.yf-grid .yf-item img{
+            width:calc(38px * var(--yf-s, 1));
+            height:calc(48px * var(--yf-s, 1));
+        }
+        .yf-panel.yf-grid .yf-jp{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     `;
     document.head.appendChild(style);
 
     const tab = document.createElement('div');
     tab.className = 'yf-tab';
-    tab.innerHTML = '我想看的新番 <span></span>';
+    tab.innerHTML = '追番列表 <span></span>';
     const count = tab.querySelector('span');
     const panel = document.createElement('div');
     panel.className = 'yf-panel';
@@ -95,6 +102,9 @@
                 <div class="yf-backup-option" id="yf-import-btn">導入備份</div>
             </div>
         </div>
+        <div class="yf-grid-toggle">
+            <span class="yf-grid-btn" title="並排顯示">▦</span>
+        </div>
         <div class="yf-lang-toggle">
             <span class="yf-lang-btn yf-lang-tw" data-lang="tw">繁</span>
             <span class="yf-lang-btn yf-lang-cn" data-lang="cn">簡</span>
@@ -104,8 +114,7 @@
     panel.appendChild(head);
     panel.appendChild(content);
 
-    // ======== 优化后的高精度简繁词典与映射 ========
-    // 采用精准的字对字映射表，避免乱码或错位
+    // ======== 简繁词典（保持原样） ========
     const simpleMap = {
         "万": "萬", "与": "與", "丑": "醜", "专": "專", "业": "業", "丛": "叢", "东": "東", "丝": "絲", "丢": "丟", "两": "兩",
         "严": "嚴", "丧": "喪", "个": "個", "丰": "豐", "临": "臨", "为": "為", "丽": "麗", "举": "舉", "么": "麼", "义": "義",
@@ -351,7 +360,6 @@
         "龊": "齪", "龋": "齲", "龌": "齪", "龙": "龍", "庞": "龐", "龛": "龕", "龟": "龜"
     };
 
-    // 构建繁体到简体的反向映射表
     const traditionalMap = {};
     for (let s in simpleMap) {
         traditionalMap[simpleMap[s]] = s;
@@ -383,7 +391,7 @@
         }
     }
 
-    let currentLang = GM_getValue('yf_lang', 'tw'); // 默认繁体
+    let currentLang = GM_getValue('yf_lang', 'tw');
 
     function applyLang(lang) {
         currentLang = lang;
@@ -405,6 +413,28 @@
         };
     });
 
+    // ======== 新增：并排/网格模式切换 ========
+    const gridBtn = head.querySelector('.yf-grid-btn');
+    let currentGridMode = GM_getValue('yf_grid', false);
+
+    function applyGridMode(on) {
+        currentGridMode = !!on;
+        GM_setValue('yf_grid', currentGridMode);
+        if (currentGridMode) {
+            panel.classList.add('yf-grid');
+        } else {
+            panel.classList.remove('yf-grid');
+        }
+        gridBtn.className = 'yf-grid-btn' + (currentGridMode ? ' active' : '');
+        gridBtn.title = currentGridMode ? '切換為列表顯示' : '並排顯示';
+    }
+
+    gridBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        applyGridMode(!currentGridMode);
+    };
+
+    // ======== 备份导出/导入 ========
     const exportBtn = head.querySelector('#yf-export-btn');
     const importBtn = head.querySelector('#yf-import-btn');
 
@@ -498,7 +528,8 @@
 
     function makePanelDraggable(panelEl, handle) {
         handle.onpointerdown = ev => {
-            if (ev.button !== 0 || ev.target.closest('.yf-close, .yf-lang-toggle, .yf-backup-container')) return;
+            // 排除关闭/语言/并排/备份按钮区域，避免误触拖拽
+            if (ev.button !== 0 || ev.target.closest('.yf-close, .yf-lang-toggle, .yf-grid-toggle, .yf-backup-container')) return;
 
             const sx = ev.clientX, sy = ev.clientY;
             const left = parseFloat(panelEl.style.left), top = parseFloat(panelEl.style.top);
@@ -546,30 +577,7 @@
 
     let cachedImages = [];
     let cachedDateHeaders = [];
-function render(targetExpandMonth = null) {
-    const data = load();
-    const keys = Object.keys(data).sort().reverse();
-    // ... (計算總數與清空 content 的邏輯維持不變) ...
 
-    keys.forEach(k => {
-        const list = data[k];
-        if (!list || list.length === 0) return;
-
-        const details = document.createElement('details');
-        details.className = 'yf-season-group';
-
-        // 【核心邏輯】如果指定了要展開的季度，或者總共只有一季，則保持展開；其餘預設摺疊
-        if (targetExpandMonth ? k === targetExpandMonth : keys.length === 1) {
-            details.open = true;
-        }
-
-        const summary = document.createElement('summary');
-        summary.textContent = `${k} (${list.length})`;
-        details.appendChild(summary);
-
-        // ... (下方組裝 list 項目與 append 的邏輯維持不變) ...
-    });
-}
     function initCaches() {
         cachedImages = [...document.querySelectorAll('img')].filter(img => {
             const w = img.clientWidth || parseInt(img.getAttribute('width') || '0', 10);
@@ -682,7 +690,7 @@ function render(targetExpandMonth = null) {
         list.forEach(f => { (groups[f.month] = groups[f.month] || []).push(f); });
         const months = Object.keys(groups).sort((a, b) => groups[b][0].ym - groups[a][0].ym);
 
-        content.innerHTML = '<details open><summary>我想看的</summary>' + months.map(mo =>
+        content.innerHTML = '<details open><summary>追番列表</summary>' + months.map(mo =>
             '<details open><summary>' + esc(mo) + ' (' + groups[mo].length + ')</summary>' +
             groups[mo].sort((a, b) => a.t - b.t).map(f =>
                 '<div class="yf-item"><img referrerpolicy="no-referrer" src="' + esc(f.cover) + '">' +
@@ -696,7 +704,6 @@ function render(targetExpandMonth = null) {
 
         traverseAndConvert(content, currentLang === 'tw');
     }
-
 
     function refresh() {
         const favs = load();
@@ -724,7 +731,7 @@ function render(targetExpandMonth = null) {
 
         const star = document.createElement('span');
         star.className = 'yf-star';
-        star.title = '加入我想看的';
+        star.title = '加入追番列表';
         star.onclick = async (ev) => {
             ev.stopPropagation();
             const favs = load();
@@ -748,6 +755,9 @@ function render(targetExpandMonth = null) {
     });
 
     refresh();
+
+    // 初始化并排模式（在面板已挂到 DOM 之后）
+    applyGridMode(currentGridMode);
 
     setTimeout(() => { applyLang(currentLang); }, 50);
 
