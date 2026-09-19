@@ -240,7 +240,6 @@
       e.badge.style.top = (last.top - host.top + (last.height - e.badge.offsetHeight) / 2) + 'px';
     });
   }
-
   placeBadges();
   window.addEventListener('load', placeBadges);
   window.addEventListener('resize', placeBadges);
