@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         長門番堂新番追番列表
 // @namespace    yuc-fav
-// @version      2.4
+// @version      2.6
 // @match        *://yuc.wiki/*
 // @connect      i0.hdslb.com
 // @connect      *
@@ -39,7 +39,6 @@
         .yf-lang-btn:hover:not(.active){color:#fff;background:#444;}
         .yf-lang-btn.active{background:#e8f0fe;color:#1a73e8;font-weight:bold;}
 
-        /* 新增：并排/网格模式切换按钮 */
         .yf-grid-toggle{position:absolute;right:100px;top:3px;}
         .yf-grid-btn{padding:2px 8px;font-size:12px;cursor:pointer;color:#aaa;background:#333;border:1px solid #444;border-radius:4px;line-height:1.4;user-select:none;transition:all 0.15s;display:inline-block;}
         .yf-grid-btn:hover:not(.active){color:#fff;background:#444;}
@@ -63,7 +62,6 @@
         .yf-del{cursor:pointer;color:#c66;padding:4px 8px;user-select:none;flex:none}
         .yf-star{position:absolute;z-index:10;right:4px;top:2px;font-size:24px;line-height:1;cursor:pointer;color:#f5a623;user-select:none}
 
-        /* 新增：并排模式（网格布局） */
         .yf-panel.yf-grid .yf-item{
             display:inline-flex;
             width:calc(50% - 4px);
@@ -413,7 +411,7 @@
         };
     });
 
-    // ======== 新增：并排/网格模式切换 ========
+    // ======== 并排/网格模式切换 ========
     const gridBtn = head.querySelector('.yf-grid-btn');
     let currentGridMode = GM_getValue('yf_grid', false);
 
@@ -528,7 +526,6 @@
 
     function makePanelDraggable(panelEl, handle) {
         handle.onpointerdown = ev => {
-            // 排除关闭/语言/并排/备份按钮区域，避免误触拖拽
             if (ev.button !== 0 || ev.target.closest('.yf-close, .yf-lang-toggle, .yf-grid-toggle, .yf-backup-container')) return;
 
             const sx = ev.clientX, sy = ev.clientY;
@@ -677,33 +674,79 @@
         });
     }
 
+    // 【新增】待展开的季度月份（用于点击网页上的 ☆ 后，只展开该季度）
+    let pendingExpandMonth = null;
+
     function render() {
-        const favs = load();
-        const list = Object.values(favs);
-        count.textContent = list.length;
-        if (!list.length) {
-            content.innerHTML = '<p style="padding:10px">還沒有收藏，點標題欄右邊的 ☆ 加入</p>';
-            traverseAndConvert(content, currentLang === 'tw');
-            return;
-        }
-        const groups = {};
-        list.forEach(f => { (groups[f.month] = groups[f.month] || []).push(f); });
-        const months = Object.keys(groups).sort((a, b) => groups[b][0].ym - groups[a][0].ym);
+    const favs = load();
+    const list = Object.values(favs);
+    count.textContent = list.length;
 
-        content.innerHTML = '<details open><summary>追番列表</summary>' + months.map(mo =>
-            '<details open><summary>' + esc(mo) + ' (' + groups[mo].length + ')</summary>' +
-            groups[mo].sort((a, b) => a.t - b.t).map(f =>
-                '<div class="yf-item"><img referrerpolicy="no-referrer" src="' + esc(f.cover) + '">' +
-                '<div class="yf-info">' +
-                '<div class="yf-cn">' + (f.day ? '<span class="yf-day-inline">[' + esc(f.day) + ']</span>' : '') + esc(f.cn) + '</div>' +
-                '<div class="yf-jp">' + esc(f.jp) + '</div>' +
-                '<div class="yf-tag">' + esc(f.type) + (f.genre ? ' | ' + esc(f.genre) : '') + '</div></div>' +
-                '<span class="yf-del" data-key="' + esc(f.month + '|' + f.cn) + '">×</span></div>'
-            ).join('') + '</details>'
-        ).join('') + '</details>';
-
-        traverseAndConvert(content, currentLang === 'tw');
+    // 【新增】重建前先捕获当前各季度的折叠状态
+    const openState = {};
+    const oldOuter = content.querySelector(':scope > details');
+    if (oldOuter) {
+        oldOuter.querySelectorAll(':scope > details[data-month]').forEach(d => {
+            openState[d.dataset.month] = d.open;
+        });
     }
+
+    if (!list.length) {
+        content.innerHTML = '<p style="padding:10px">還沒有收藏，點標題欄右邊的 ☆ 加入</p>';
+        traverseAndConvert(content, currentLang === 'tw');
+        return;
+    }
+    const groups = {};
+    list.forEach(f => { (groups[f.month] = groups[f.month] || []).push(f); });
+    const months = Object.keys(groups).sort((a, b) => groups[b][0].ym - groups[a][0].ym);
+
+    // 【注意】这里不再直接写死 open 属性，交给下面根据状态恢复
+    content.innerHTML = '<details open><summary>追番列表</summary>' + months.map(mo =>
+        '<details data-month="' + esc(mo) + '"><summary>' + esc(mo) + ' (' + groups[mo].length + ')</summary>' +
+        groups[mo].sort((a, b) => a.t - b.t).map(f =>
+            '<div class="yf-item"><img referrerpolicy="no-referrer" src="' + esc(f.cover) + '">' +
+            '<div class="yf-info">' +
+            '<div class="yf-cn">' + (f.day ? '<span class="yf-day-inline">[' + esc(f.day) + ']</span>' : '') + esc(f.cn) + '</div>' +
+            '<div class="yf-jp">' + esc(f.jp) + '</div>' +
+            '<div class="yf-tag">' + esc(f.type) + (f.genre ? ' | ' + esc(f.genre) : '') + '</div></div>' +
+            '<span class="yf-del" data-key="' + esc(f.month + '|' + f.cn) + '">×</span></div>'
+        ).join('') + '</details>'
+    ).join('') + '</details>';
+
+    const outerDetails = content.querySelector(':scope > details');
+    if (outerDetails) {
+        const innerDetails = [...outerDetails.querySelectorAll(':scope > details[data-month]')];
+
+        // 【核心】恢复每个季度的 open 状态
+        if (pendingExpandMonth) {
+            // 分支 A：刚在网页上点了 ☆ 收藏 → 只展开目标季度，其他全部折叠
+            const target = pendingExpandMonth;
+            pendingExpandMonth = null;
+            innerDetails.forEach(d => { d.open = (d.dataset.month === target); });
+        } else {
+            // 分支 B：其他所有情况（删除收藏、语言切换、网格切换等）
+            //         原样恢复此前的折叠状态；首次出现的季度默认展开
+            innerDetails.forEach(d => {
+                d.open = (d.dataset.month in openState) ? openState[d.dataset.month] : true;
+            });
+        }
+        outerDetails.open = true;
+
+        // 外层「追番列表」summary 作为批量折叠/展开所有季度的开关
+        const outerSummary = outerDetails.querySelector(':scope > summary');
+        if (outerSummary) {
+            outerSummary.onclick = (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const anyOpen = innerDetails.some(d => d.open);
+                innerDetails.forEach(d => { d.open = !anyOpen; });
+                outerDetails.open = true;
+            };
+        }
+    }
+
+    traverseAndConvert(content, currentLang === 'tw');
+}
 
     function refresh() {
         const favs = load();
@@ -736,6 +779,7 @@
             ev.stopPropagation();
             const favs = load();
             if (favs[e.key]) {
+                // 取消收藏：不触发季度自动展开
                 delete favs[e.key];
                 save(favs);
                 refresh();
@@ -747,6 +791,10 @@
 
                 favs[e.key] = Object.assign(data, { t: Date.now() });
                 save(favs);
+
+                // 【新增】标记：本次收藏后，面板只展开当前所在季度
+                pendingExpandMonth = month;
+
                 refresh();
             }
         };
