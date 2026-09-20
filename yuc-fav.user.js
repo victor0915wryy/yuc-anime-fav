@@ -29,8 +29,9 @@
     const style = document.createElement('style');
     style.textContent = `
         .yf-tab{position:fixed;right:20px;width:96px;padding:6px 0;text-align:center;font-size:12px;background:#333;color:#eee;cursor:pointer;z-index:99999;border-radius:6px;user-select:none;touch-action:none}
-        .yf-panel{position:fixed;width:340px;min-width:260px;max-width:95vw;min-height:120px;max-height:90vh;resize:both;overflow:auto;background:#2b2b2b;color:#eee;font:13px sans-serif;border:1px solid #555;z-index:99999;display:none}
-        .yf-head{position:sticky;top:0;z-index:1;padding:4px 8px;font-size:12px;color:#aaa;background:#222;cursor:move;user-select:none;touch-action:none}
+
+        /* 【改】font 拆开写，font-size 用 calc(--yf-ts)，上限 1.3；--yf-ts 由 JS 同步写入 */
+        .yf-panel{position:fixed;width:340px;min-width:260px;max-width:95vw;min-height:120px;max-height:calc(100vh - 8px);resize:both;overflow:auto;background:#2b2b2b;color:#eee;font-family:sans-serif;font-size:calc(13px * var(--yf-ts, 1));border:1px solid #555;z-index:99999;display:none}        .yf-head{position:sticky;top:0;z-index:1;padding:4px 8px;font-size:12px;color:#aaa;background:#222;cursor:move;user-select:none;touch-action:none}
         .yf-close{position:absolute;right:8px;top:2px;font-size:16px;cursor:pointer;color:#aaa;line-height:1;padding:0 6px;border-radius:4px}
         .yf-close:hover{color:#fff;background:#d32f2f}
 
@@ -53,29 +54,36 @@
         .yf-backup-option:hover{background:#444;color:#fff;}
 
         .yf-panel summary{cursor:pointer;padding:6px 8px;background:#3a3a3a}
-        .yf-item{display:flex;gap:8px;padding:6px 8px;border-top:1px solid #444;align-items:center;height:48px;box-sizing:border-box}
+
+        /* 【改】列表模式：间距/padding 用 --yf-ts；min-height 跟随图片高度 + padding，彻底避免图片溢出边框 */
+        .yf-item{display:flex;gap:calc(8px * var(--yf-ts, 1));padding:calc(6px * var(--yf-ts, 1)) calc(8px * var(--yf-ts, 1));border-top:1px solid #444;align-items:center;min-height:calc(56px * var(--yf-s, 1) + 12px * var(--yf-ts, 1));box-sizing:border-box}
         .yf-item img{width:calc(45px * var(--yf-s, 1));height:calc(56px * var(--yf-s, 1));object-fit:cover;flex:none;background:#444;border-radius:3px}
         .yf-info{flex:1;overflow:hidden}
         .yf-cn{font-weight:bold}
-        .yf-jp,.yf-tag{color:#aaa;font-size:12px}
+        .yf-jp,.yf-tag{color:#aaa;font-size:calc(12px * var(--yf-ts, 1))}
         .yf-day-inline{color:#ff5252;font-weight:bold;margin-right:4px}
-        .yf-del{cursor:pointer;color:#c66;padding:4px 8px;user-select:none;flex:none}
+        .yf-del{cursor:pointer;color:#c66;padding:calc(4px * var(--yf-ts, 1)) calc(8px * var(--yf-ts, 1));user-select:none;flex:none}
         .yf-star{position:absolute;z-index:10;right:4px;top:2px;font-size:24px;line-height:1;cursor:pointer;color:#f5a623;user-select:none}
 
+       /* 【改】并排模式：卡片两列；图片尺寸与列表模式相同，跟随 --yf-s 缩放 */
         .yf-panel.yf-grid .yf-item{
             display:inline-flex;
             width:calc(50% - 4px);
             margin:2px;
             vertical-align:top;
             height:auto;
-            min-height:48px;
+            min-height:calc(56px * var(--yf-s, 1) + 12px * var(--yf-ts, 1));
             border:1px solid #444;
             border-radius:4px;
             box-sizing:border-box;
         }
         .yf-panel.yf-grid .yf-item img{
-            width:calc(38px * var(--yf-s, 1));
-            height:calc(48px * var(--yf-s, 1));
+            width:calc(45px * var(--yf-s, 1));
+            height:calc(56px * var(--yf-s, 1));
+        }
+        /* 【改】面板过窄时（< 500px），并排模式直接隐藏图片，只留文字 */
+        .yf-panel.yf-grid.yf-narrow .yf-item img{
+            display:none;
         }
         .yf-panel.yf-grid .yf-jp{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     `;
@@ -490,9 +498,9 @@
 
     const pos = GM_getValue('pos', {});
 
-    function placePanel(el, left, top) {
+     function placePanel(el, left, top) {
         el.style.left = Math.max(0, Math.min(left, innerWidth - el.offsetWidth)) + 'px';
-        el.style.top = Math.max(0, Math.min(top, innerHeight - 40)) + 'px';
+        el.style.top = Math.max(0, Math.min(top, innerHeight - 8)) + 'px';
     }
 
     function savePos() {
@@ -556,10 +564,16 @@
     makeTabDraggable(tab);
     makePanelDraggable(panel, head);
 
-    let timer;
+       let timer;
     new ResizeObserver(() => {
-        const r = panel.offsetWidth / 340;
-        panel.style.setProperty('--yf-s', Math.min(4, Math.max(1, 1 + (r - 1) * 0.7)));
+        const w = panel.offsetWidth;
+        const r = w / 340;
+        const s = Math.min(4, Math.max(1, 1 + (r - 1) * 0.5));
+        const ts = Math.min(s, 1.3);
+        panel.style.setProperty('--yf-s', s);
+        panel.style.setProperty('--yf-ts', ts);
+        // 【改】阈值从 300 提高到 500：并排模式下面板窄于 500px 时不显示图片
+        panel.classList.toggle('yf-narrow', w < 500);
         clearTimeout(timer);
         timer = setTimeout(savePos, 300);
     }).observe(panel);
